@@ -2,108 +2,80 @@ StepperDriver
 =============
 
 A4988, DRV8825 and generic two-pin stepper motor driver library.
-Currently supported: 
-   - <a href="https://www.pololu.com/product/2134">DRV8834</a> Low-Voltage Stepper Motor Driver
-     up to 1:32
-   - <a href="https://www.pololu.com/product/1182">A4988</a> Stepper Motor Driver up to 1:16
-   - <a href="https://www.pololu.com/product/2131">DRV8825</a> up to 1:32
-   - any 2-pin stepper via DIR and STEP pins.
+Original version, wiring and more info: 
+<a href="https://github.com/laurb9/StepperDriver">https://github.com/laurb9/StepperDriver</a>
+Thanks to Laurentiu Badea for making this lib!
 
-Motors
-======
-
-4-wire bipolar stepper motor or some 6-wire unipolar in 4-wire configuration (leaving centers out).
-
-Connections
 ===========
+This version is used for our camera slider project. (ESP8266 + DRV8825 + Motor) 
+Pictures, schematics, test video coming soon.
 
-Minimal configuration from <a href="https://www.pololu.com/product/2134">Pololu DRV8834 page</a>:
+We added:
+	- Internal function for non-blocking timming
+	- Stop() function
+	- status(), isMoving(), getDirection() functions 
+	- onMove callback function
 
-<img src="https://a.pololu-files.com/picture/0J4344.600.png">
 
-Wiring
-======
-
-- Arduino to driver board:
-    - DIR - D8
-    - STEP - D9
-    - SLEEP - HIGH (Vdd)
-    - GND - Arduino GND
-    - GND - Motor power GND
-    - VMOT - Motor power (check driver-specific voltage range)
-    - A4988/DRV8825 microstep control
-      - MS1/MODE0 - D10
-      - MS2/MODE1 - D11
-      - MS3/MODE2 - D12
-    - DRV8834 microstep control
-      - M0 - D10
-      - M1 - D11
-    - ~ENABLE (optional) recommend D13 to visually check if coils are active
-
-- driver board to motor (this varies from motor to motor, check motor coils schematic).
-  I just list the motor wires counter-clockwise
-    - A1 - RED
-    - A2 - GRN
-    - B1 - YEL
-    - B2 - BLU 
-
-- 100uF capacitor between GND - VMOT 
-- Set the max current on the driver board to the motor limit (see below).
-- Have a motor power supply that can deliver that current.
-
-Set Max Current
-===============
-
-The max current is set via the potentiometer on board.
-Turn it while measuring voltage at the passthrough next to it.
-The formula is V = I*5*R where I=max current, R=current sense resistor installed onboard
-
-- DRV8834 Pololu board, R=0.1 and V = 0.5 * max current(A). 
-  For example, for 1A you will set it to 0.5V.
-
-- DRV8825 low-current board, R=0.33 and V = 1.65 * max current(A).
-  For example, for 0.5A the reference voltage should be 0.82V
-
-Code
+Sample code
 ====
-
-See the BasicStepperDriver example for a generic driver that should work with any board
-supporting the DIR/STEP indexing mode.
-
-The Microstepping example works with a DRV8834 board.
-
-For example, to show what is possible, here is the ClockStepper example that moves a 
-stepper motor like the seconds hand of a watch:
 
 ```C++
 #include <Arduino.h>
-#include "A4988.h"
+#include "DRV8825.h"
 
-// using a 200-step motor (most common)
-// pins used are DIR, STEP, MS1, MS2, MS3 in that order
-A4988 stepper(200, 8, 9, 10, 11, 12);
+#define MOTOR_STEPS 200
+#define MOTOR_DIR_PIN 5
+#define MOTOR_STEP_PIN 4
+#define DRV_MODE0 13
+#define DRV_MODE1 12
+#define DRV_MODE2 15
+
+//Left & right limit switch pins
+#define DRV_LEFT_STOP 14
+#define DRV_RIGHT_STOP 16
+
+int leftSwitch = 0;
+int rightSwitch = 0;
+
+DRV8825 driver(MOTOR_STEPS, MOTOR_DIR_PIN, MOTOR_STEP_PIN, DRV_MODE0, DRV_MODE1, DRV_MODE2);
 
 void setup() {
-    // Set target motor RPM to 1RPM
-    stepper.setRPM(1);
-    // Set full speed mode (microstepping also works for smoother hand movement
-    stepper.setMicrostep(1);
+	//init with 100 rpm & 1 microstep
+	driver.begin(100, 1);
+	
+	//onMove callback
+	driver.onMove(Driver_OnMove);
 }
 
 void loop() {
-    // Tell motor to rotate 360 degrees. That's it.
-    stepper.rotate(360);
+   //watch for limit switches
+   leftSwitch  = digitalRead(DRV_LEFT_STOP);
+   rightSwitch = digitalRead(DRV_RIGHT_STOP); 
+   
+   //if camera moves to left side 
+   if (driver.getDirection()==0) {
+	  //if the camera reaches the left side switch stop the motor immediately
+	  if (leftSwitch) {
+		 driver.stop();
+	  }
+   }
+   //if camera moves to right side 
+   else if (driver.getDirection()==0) {
+	  //if the camera reaches the right side switch stop the motor immediately
+	  if (rightSwitch) {
+		 driver.stop();
+	  }
+   }
+   
+   //move it if needed
+   driver.moveLoop();
+}
+
+//this function will be called on each motor step
+void Driver_OnMove(long rem_steps, long steps_count) {
+	//long rem_steps = remaining steps
+	//long steps_count = elapsed steps
 }
 ```
 
-Hardware
-========
-- Arduino-compatible board
-- A <a href="https://www.pololu.com/category/120/stepper-motor-drivers">stepper motor driver</a>, for example DRV8834, DRV8825, DRV8824, A4988.
-- A <a href="http://www.circuitspecialists.com/stepper-motor">Stepper Motor</a>.
-- 1 x 100uF capacitor
-
-Notes
-=====
-For DRV8834, if 1:4 and 1:32 microstepping modes do not work, add a 470K resistor
-from M0 to GND.
