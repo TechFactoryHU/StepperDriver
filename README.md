@@ -1,25 +1,23 @@
 StepperDriver
 =============
-
 A4988, DRV8825 and generic two-pin stepper motor driver library.
+
 Original version, wiring and more info: 
 <a href="https://github.com/laurb9/StepperDriver">https://github.com/laurb9/StepperDriver</a>
 Thanks to Laurentiu Badea for making this lib!
 
-===========
 This version is used for our camera slider project. (ESP8266 + DRV8825 + Motor) 
 Pictures, schematics, test video coming soon.
 
-We added:
-	- Internal function for non-blocking timming
-	- Stop() function
-	- status(), isMoving(), getDirection() functions 
-	- onMove callback function
+Our modifications:
 
+ - internal function for non-blocking timming
+ - Stop() function
+ - status(), isMoving(), getDirection() functions 
+ - onMove callback function
 
 Sample code
-====
-
+==========
 ```C++
 #include <Arduino.h>
 #include "DRV8825.h"
