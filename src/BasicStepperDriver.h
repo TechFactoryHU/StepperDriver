@@ -49,6 +49,8 @@ protected:
     short dir_pin;
     short step_pin;
     short enable_pin = PIN_UNCONNECTED;
+    bool pinstatus = false;
+    
     // Get max microsteps supported by the device
     virtual short getMaxMicrostep();
     // current microstep level (1,2,4,8,...), must be < getMaxMicrostep()
@@ -71,6 +73,7 @@ protected:
     long steps_to_cruise;   // steps to reach cruising (max) rpm
     long steps_to_brake;    // steps needed to come to a full stop
     long step_pulse;        // step pulse duration (microseconds)
+    unsigned long step_next_ms; 
 
     // DIR pin state
     short dir_state;
@@ -82,6 +85,7 @@ protected:
 private:
     // microstep range (1, 16, 32 etc)
     static const short MAX_MICROSTEP = 128;
+    void (*_onMoveCallback)(long,long); //remaining steps, steps count
 
 public:
     /*
@@ -119,6 +123,20 @@ public:
      */
     void move(long steps);
     /*
+    *  Non-blocking move; need to call in main loop continously
+    */
+    void moveLoop(unsigned long ms=0);
+    /*
+    *	Set a callback function. it will be called on every step
+    *	long = remaining steps
+    *	long = steps count
+    */
+    void onMove(void (*onMoveCallback)(long, long));
+    /*
+    *   Returns true if driver has peding step otherwise false
+    */
+    bool isMoving(void);
+    /*
      * Rotate the motor a given number of degrees (1-360)
      */
     void rotate(long deg);
@@ -134,6 +152,12 @@ public:
      */
     void enable(void);
     void disable(void);
+    bool status(void);
+    /*
+    *	Stops the motor immediately 
+    */
+    void stop(void);
+
     /*
      * Methods to allow external timing control.
      * These should not be needed for normal use.
@@ -165,5 +189,11 @@ public:
     long calcStepsForRotation(double deg){
         return deg * motor_steps * microsteps / 360;
     }
+    /*
+    *	Get current direction
+    */
+    short getDirection() {
+		return dir_state;
+    } 
 };
 #endif // STEPPER_DRIVER_BASE_H

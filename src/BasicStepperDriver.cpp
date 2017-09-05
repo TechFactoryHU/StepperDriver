@@ -84,14 +84,39 @@ void BasicStepperDriver::setSpeedProfile(Mode mode, short accel, short decel){
  * Move the motor a given number of steps.
  * positive to move forward, negative to reverse
  */
+ 
 void BasicStepperDriver::move(long steps){
     long next_event;
     startMove(steps);
-    do {
+   //while moved to BasicStepperDriver::moveLoop()
+   /* do {
         next_event = nextAction();
         microWaitUntil(micros() + next_event);
-    } while (next_event);
+    } while (next_event);*/
 }
+
+/*
+ *	Callback function; will be called on every step
+ */
+void BasicStepperDriver::onMove( void (*onMoveCallback)(long,long)) {
+	_onMoveCallback = onMoveCallback;
+}
+
+/* 
+*  Need to call it in main loop continously
+*  In this version you can interrupt pending move (e.g. you can use a limit switch)
+*/ 
+void BasicStepperDriver::moveLoop(unsigned long ms) {
+	long next_event;
+	if (ms == 0) { ms = micros(); }
+	if (step_next_ms <= ms) {
+		next_event = nextAction();
+		if (next_event > 0) {
+			step_next_ms = ms+next_event;
+		}
+	}
+}
+
 /*
  * Move the motor a given number of degrees (1-360)
  */
@@ -116,6 +141,8 @@ void BasicStepperDriver::startMove(long steps){
     step_state = LOW;
     steps_remaining = abs(steps);
     step_count = 0;
+    _onMoveCallback(steps_remaining,step_count);
+    
     switch (mode){
         case LINEAR_SPEED:
             // speed is in [steps/s]
@@ -230,6 +257,7 @@ long BasicStepperDriver::nextAction(void){
         unsigned m = micros();
         if (step_state == LOW){
             calcStepPulse();
+            _onMoveCallback(steps_remaining,step_count);
         }
         m = micros() - m;
         /*
@@ -242,21 +270,45 @@ long BasicStepperDriver::nextAction(void){
     }
 }
 
+bool BasicStepperDriver::isMoving(void) {
+	if (steps_remaining > 0){ 
+		return true;
+	}
+	return false;
+}
+
+/*
+*	Stop the motor 
+*/
+void BasicStepperDriver::stop(void) {
+	steps_remaining = 0;
+}
+
 /*
  * Enable/Disable the motor by setting a digital flag
  */
 void BasicStepperDriver::enable(void){
     if IS_CONNECTED(enable_pin){
+		pinstatus = true;
         digitalWrite(enable_pin, LOW);
     }
 }
 
 void BasicStepperDriver::disable(void){
     if IS_CONNECTED(enable_pin){
+		pinstatus = false;
         digitalWrite(enable_pin, HIGH);
     }
+}
+
+bool BasicStepperDriver::status(void){
+	return pinstatus;
 }
 
 short BasicStepperDriver::getMaxMicrostep(){
     return BasicStepperDriver::MAX_MICROSTEP;
 }
+
+
+
+
